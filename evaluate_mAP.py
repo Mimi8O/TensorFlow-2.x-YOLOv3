@@ -28,6 +28,26 @@ if len(gpus) > 0:
     except RuntimeError: print("RuntimeError in tf.config.experimental.list_physical_devices('GPU')")
 
 
+def visualize_predictions(image, bboxes_gt, bboxes_pred, NUM_CLASS, index):
+    # Ground truth bounding boxes (Green)
+    for bbox in bboxes_gt:
+        x1, y1, x2, y2, cls = bbox
+        class_name = NUM_CLASS[int(cls)]
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(image, f"GT: {class_name}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    # Predicted bounding boxes (Red)
+    for bbox in bboxes_pred:
+        x1, y1, x2, y2, score, cls = bbox
+        class_name = NUM_CLASS[int(cls)]
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        cv2.putText(image, f"Pred: {class_name} {score:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    # Save the image to a file
+    cv2.imwrite(f'predictions_{index}.jpg', image)
+
+
+
 def voc_ap(rec, prec):
     rec.insert(0, 0.0)
     rec.append(1.0)
@@ -270,11 +290,6 @@ if __name__ == '__main__':
         else:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
             yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}") # use custom weights
-
-        # 디버깅용 모델 요약 정보 출력
-        yolo.summary()
-        for layer in yolo.layers:
-            print(layer.output_shape)
         
     elif YOLO_FRAMEWORK == "trt": # TensorRT detection
         saved_model_loaded = tf.saved_model.load(f"./checkpoints/{TRAIN_MODEL_NAME}", tags=[tag_constants.SERVING])
