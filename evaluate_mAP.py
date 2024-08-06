@@ -29,47 +29,18 @@ if len(gpus) > 0:
 
 
 def voc_ap(rec, prec):
-    """
-    --- Official matlab code VOC2012---
-    mrec=[0 ; rec ; 1];
-    mpre=[0 ; prec ; 0];
-    for i=numel(mpre)-1:-1:1
-            mpre(i)=max(mpre(i),mpre(i+1));
-    end
-    i=find(mrec(2:end)~=mrec(1:end-1))+1;
-    ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
-    """
     rec.insert(0, 0.0) # insert 0.0 at begining of list
     rec.append(1.0) # insert 1.0 at end of list
     mrec = rec[:]
     prec.insert(0, 0.0) # insert 0.0 at begining of list
     prec.append(0.0) # insert 0.0 at end of list
     mpre = prec[:]
-    """
-     This part makes the precision monotonically decreasing
-        (goes from the end to the beginning)
-        matlab:  for i=numel(mpre)-1:-1:1
-                                mpre(i)=max(mpre(i),mpre(i+1));
-    """
-    # matlab indexes start in 1 but python in 0, so I have to do:
-    #   range(start=(len(mpre) - 2), end=0, step=-1)
-    # also the python function range excludes the end, resulting in:
-    #   range(start=(len(mpre) - 2), end=-1, step=-1)
     for i in range(len(mpre)-2, -1, -1):
         mpre[i] = max(mpre[i], mpre[i+1])
-    """
-     This part creates a list of indexes where the recall changes
-        matlab:  i=find(mrec(2:end)~=mrec(1:end-1))+1;
-    """
     i_list = []
     for i in range(1, len(mrec)):
         if mrec[i] != mrec[i-1]:
             i_list.append(i) # if it was matlab would be i + 1
-    """
-     The Average Precision (AP) is the area under the curve
-        (numerical integration)
-        matlab: ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
-    """
     ap = 0.0
     for i in i_list:
         ap += ((mrec[i]-mrec[i-1])*mpre[i])
@@ -106,21 +77,18 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         for i in range(num_bbox_gt):
             class_name = NUM_CLASS[classes_gt[i]]
             xmin, ymin, xmax, ymax = list(map(str, bboxes_gt[i]))
-            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
+            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
             bounding_boxes.append({"class_name":class_name, "bbox":bbox, "used":False})
 
-            # count that object
             if class_name in gt_counter_per_class:
                 gt_counter_per_class[class_name] += 1
             else:
-                # if class didn't exist yet
                 gt_counter_per_class[class_name] = 1
             bbox_mess = ' '.join([class_name, xmin, ymin, xmax, ymax]) + '\n'
         with open(f'{ground_truth_dir_path}/{str(index)}_ground_truth.json', 'w') as outfile:
             json.dump(bounding_boxes, outfile)
 
     gt_classes = list(gt_counter_per_class.keys())
-    # sort the classes alphabetically
     gt_classes = sorted(gt_classes)
     n_classes = len(gt_classes)
 
@@ -163,11 +131,15 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
             class_ind = int(bbox[5])
-            class_name = NUM_CLASS[class_ind]
-            score = '%.4f' % score
-            xmin, ymin, xmax, ymax = list(map(str, coor))
-            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
-            json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
+            
+            if class_ind < len(NUM_CLASS):
+                class_name = NUM_CLASS[class_ind]
+                score = '%.4f' % score
+                xmin, ymin, xmax, ymax = list(map(str, coor))
+                bbox = xmin + " " + ymin + " " + xmax + " " + ymax
+                json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
+            else:
+                print(f"Warning: class index {class_ind} is out of bounds for NUM_CLASS with length {len(NUM_CLASS)}")
 
     ms = sum(times)/len(times)*1000
     fps = 1000 / ms
@@ -177,42 +149,33 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         with open(f'{ground_truth_dir_path}/{class_name}_predictions.json', 'w') as outfile:
             json.dump(json_pred[gt_classes.index(class_name)], outfile)
 
-    # Calculate the AP for each class
     sum_AP = 0.0
     ap_dictionary = {}
-    # open file to store the results
     with open("mAP/results.txt", 'w') as results_file:
         results_file.write("# AP and precision/recall per class\n")
         count_true_positives = {}
         for class_index, class_name in enumerate(gt_classes):
             count_true_positives[class_name] = 0
-            # Load predictions of that class
             predictions_file = f'{ground_truth_dir_path}/{class_name}_predictions.json'
             predictions_data = json.load(open(predictions_file))
 
-            # Assign predictions to ground truth objects
             nd = len(predictions_data)
-            tp = [0] * nd # creates an array of zeros of size nd
+            tp = [0] * nd
             fp = [0] * nd
             for idx, prediction in enumerate(predictions_data):
                 file_id = prediction["file_id"]
-                # assign prediction to ground truth object if any
-                #   open ground-truth with that file_id
                 gt_file = f'{ground_truth_dir_path}/{str(file_id)}_ground_truth.json'
                 ground_truth_data = json.load(open(gt_file))
                 ovmax = -1
                 gt_match = -1
-                # load prediction bounding-box
-                bb = [ float(x) for x in prediction["bbox"].split() ] # bounding box of prediction
+                bb = [ float(x) for x in prediction["bbox"].split() ]
                 for obj in ground_truth_data:
-                    # look for a class_name match
                     if obj["class_name"] == class_name:
-                        bbgt = [ float(x) for x in obj["bbox"].split() ] # bounding box of ground truth
+                        bbgt = [ float(x) for x in obj["bbox"].split() ]
                         bi = [max(bb[0],bbgt[0]), max(bb[1],bbgt[1]), min(bb[2],bbgt[2]), min(bb[3],bbgt[3])]
                         iw = bi[2] - bi[0] + 1
                         ih = bi[3] - bi[1] + 1
                         if iw > 0 and ih > 0:
-                            # compute overlap (IoU) = area of intersection / area of union
                             ua = (bb[2] - bb[0] + 1) * (bb[3] - bb[1] + 1) + (bbgt[2] - bbgt[0]
                                             + 1) * (bbgt[3] - bbgt[1] + 1) - iw * ih
                             ov = iw * ih / ua
@@ -220,24 +183,18 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
                                 ovmax = ov
                                 gt_match = obj
 
-                # assign prediction as true positive/don't care/false positive
-                if ovmax >= MINOVERLAP:# if ovmax > minimum overlap
+                if ovmax >= MINOVERLAP:
                     if not bool(gt_match["used"]):
-                        # true positive
                         tp[idx] = 1
                         gt_match["used"] = True
                         count_true_positives[class_name] += 1
-                        # update the ".json" file
                         with open(gt_file, 'w') as f:
                             f.write(json.dumps(ground_truth_data))
                     else:
-                        # false positive (multiple detection)
                         fp[idx] = 1
                 else:
-                    # false positive
                     fp[idx] = 1
 
-            # compute precision/recall
             cumsum = 0
             for idx, val in enumerate(fp):
                 fp[idx] += cumsum
@@ -246,23 +203,19 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             for idx, val in enumerate(tp):
                 tp[idx] += cumsum
                 cumsum += val
-            #print(tp)
             rec = tp[:]
             for idx, val in enumerate(tp):
                 rec[idx] = float(tp[idx]) / gt_counter_per_class[class_name]
-            #print(rec)
             prec = tp[:]
             for idx, val in enumerate(tp):
                 prec[idx] = float(tp[idx]) / (fp[idx] + tp[idx])
-            #print(prec)
 
             ap, mrec, mprec = voc_ap(rec, prec)
             sum_AP += ap
-            text = "{0:.3f}%".format(ap*100) + " = " + class_name + " AP  " #class_name + " AP = {0:.2f}%".format(ap*100)
+            text = "{0:.3f}%".format(ap*100) + " = " + class_name + " AP  "
 
             rounded_prec = [ '%.3f' % elem for elem in prec ]
             rounded_rec = [ '%.3f' % elem for elem in rec ]
-            # Write to results.txt
             results_file.write(text + "\n Precision: " + str(rounded_prec) + "\n Recall   :" + str(rounded_rec) + "\n\n")
 
             print(text)
