@@ -231,8 +231,10 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         
         return mAP*100
 
-if __name__ == '__main__':       
-    if YOLO_FRAMEWORK == "tf":
+# evaluate_mAP.py 파일
+
+if __name__ == '__main__':
+    if YOLO_FRAMEWORK == "tf": # TensorFlow detection
         if YOLO_TYPE == "yolov4":
             Darknet_weights = YOLO_V4_TINY_WEIGHTS if TRAIN_YOLO_TINY else YOLO_V4_WEIGHTS
         if YOLO_TYPE == "yolov3":
@@ -240,15 +242,42 @@ if __name__ == '__main__':
 
         if YOLO_CUSTOM_WEIGHTS == False:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=YOLO_COCO_CLASSES)
-            load_yolo_weights(yolo, Darknet_weights)
+            load_yolo_weights(yolo, Darknet_weights) # use Darknet weights
         else:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
-            yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}")
-        
-    elif YOLO_FRAMEWORK == "trt":
+            yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}") # use custom weights
+
+    elif YOLO_FRAMEWORK == "trt": # TensorRT detection
         saved_model_loaded = tf.saved_model.load(f"./checkpoints/{TRAIN_MODEL_NAME}", tags=[tag_constants.SERVING])
         signature_keys = list(saved_model_loaded.signatures.keys())
         yolo = saved_model_loaded.signatures['serving_default']
 
     testset = Dataset('test', TEST_INPUT_SIZE=YOLO_INPUT_SIZE)
+
+    # 디버깅 코드 추가
+    NUM_CLASS = read_class_names(TRAIN_CLASSES)
+    print(f"Number of classes: {len(NUM_CLASS)}")
+
+    for index in range(testset.num_samples):
+        ann_dataset = testset.annotations[index]
+        print(f"Processing {index} - {ann_dataset}")
+        original_image, bbox_data_gt = testset.parse_annotation(ann_dataset, True)
+        print(f"Original image shape: {original_image.shape}")
+        print(f"Bbox data ground truth: {bbox_data_gt}")
+
+        # 예측 결과 디버깅
+        image = image_preprocess(np.copy(original_image), [TEST_INPUT_SIZE, TEST_INPUT_SIZE])
+        image_data = image[np.newaxis, ...].astype(np.float32)
+        pred_bbox = yolo(image_data)
+        pred_bbox = [tf.reshape(x, (-1, tf.shape(x)[-1])) for x in pred_bbox]
+        pred_bbox = tf.concat(pred_bbox, axis=0).numpy()
+
+        print(f"Predictions for image {index}: {pred_bbox}")
+
+        # 클래스 인덱스 디버깅
+        for bbox in pred_bbox:
+            class_ind = int(bbox[5])
+            if class_ind >= len(NUM_CLASS):
+                print(f"Warning: class_ind {class_ind} out of range for image {index}")
+
     get_mAP(yolo, testset, score_threshold=0.05, iou_threshold=0.50, TEST_INPUT_SIZE=YOLO_INPUT_SIZE)
