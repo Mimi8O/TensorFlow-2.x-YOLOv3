@@ -159,6 +159,14 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bboxes = postprocess_boxes(pred_bbox, original_image, TEST_INPUT_SIZE, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
 
+        # Debug: Print GT and predictions for each image
+        gt_classes_found = [NUM_CLASS[int(cls)] for cls in bbox_data_gt[:, 4]] if len(bbox_data_gt) > 0 else []
+        pred_classes_found = [NUM_CLASS[int(bbox[5])] for bbox in bboxes] if len(bboxes) > 0 else []
+
+        print(f"Image index: {index}")
+        print(f"Ground Truth Classes: {gt_classes_found}")
+        print(f"Predicted Classes: {pred_classes_found}")
+
         for bbox in bboxes:
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
@@ -246,19 +254,16 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             for idx, val in enumerate(tp):
                 tp[idx] += cumsum
                 cumsum += val
-            #print(tp)
             rec = tp[:]
             for idx, val in enumerate(tp):
                 rec[idx] = float(tp[idx]) / gt_counter_per_class[class_name]
-            #print(rec)
             prec = tp[:]
             for idx, val in enumerate(tp):
                 prec[idx] = float(tp[idx]) / (fp[idx] + tp[idx])
-            #print(prec)
 
             ap, mrec, mprec = voc_ap(rec, prec)
             sum_AP += ap
-            text = "{0:.3f}%".format(ap*100) + " = " + class_name + " AP  " #class_name + " AP = {0:.2f}%".format(ap*100)
+            text = "{0:.3f}%".format(ap*100) + " = " + class_name + " AP  "
 
             rounded_prec = [ '%.3f' % elem for elem in prec ]
             rounded_rec = [ '%.3f' % elem for elem in rec ]
