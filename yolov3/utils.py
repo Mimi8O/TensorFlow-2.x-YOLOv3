@@ -284,7 +284,7 @@ import numpy as np
 import tensorflow as tf
 from yolov3.utils import YOLO_COCO_CLASSES, image_preprocess, postprocess_boxes, nms, draw_bbox
 
-def detect_image(Yolo, image_path, output_path, input_size=416, show=False, CLASSES=YOLO_COCO_CLASSES, score_threshold=0.3, iou_threshold=0.45, rectangle_colors=''):
+def detect_image(Yolo, image_path, output_path, input_size=416, CLASSES=YOLO_COCO_CLASSES, score_threshold=0.3, iou_threshold=0.45, rectangle_colors=''):
     original_image = cv2.imread(image_path)
     original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
 
@@ -310,13 +310,8 @@ def detect_image(Yolo, image_path, output_path, input_size=416, show=False, CLAS
     image = draw_bbox(original_image, bboxes, CLASSES=CLASSES, rectangle_colors=rectangle_colors)
 
     if output_path != '': 
-        cv2.imwrite(output_path, image)
-        
-    if show:
-        plt.figure(figsize=(10, 10))
-        plt.imshow(image)
-        plt.axis('off')
-        plt.show()
+        cv2.imwrite(output_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        print(f"이미지가 성공적으로 저장되었습니다: {output_path}")
         
     return image
 
