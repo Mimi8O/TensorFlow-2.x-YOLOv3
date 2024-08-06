@@ -102,7 +102,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             class_name = NUM_CLASS[classes_gt[i]]
             print(f"Class name: {class_name}, Class index: {classes_gt[i]}")
             xmin, ymin, xmax, ymax = list(map(str, bboxes_gt[i]))
-            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
+            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
             bounding_boxes.append({"class_name":class_name, "bbox":bbox, "used":False})
 
             # count that object
@@ -155,11 +155,14 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bboxes = postprocess_boxes(pred_bbox, original_image, TEST_INPUT_SIZE, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
 
+        # 예측 결과 시각화
+        visualize_predictions(np.copy(original_image), bbox_data_gt, bboxes, NUM_CLASS, index)
+
         for bbox in bboxes:
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
             class_ind = int(bbox[5])
-            if class_ind >= NUM_CLASS_LEN:
+            if class_ind >= len(NUM_CLASS):
                 print(f"Warning: class_ind {class_ind} out of range for image {index}")
                 continue  # 잘못된 클래스 인덱스 무시
             class_name = NUM_CLASS[class_ind]
@@ -276,6 +279,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         print(text)
 
         return mAP * 100
+
 
 if __name__ == '__main__':
     if YOLO_FRAMEWORK == "tf": # TensorFlow detection
