@@ -29,18 +29,20 @@ if len(gpus) > 0:
 
 
 def voc_ap(rec, prec):
-    rec.insert(0, 0.0) # insert 0.0 at begining of list
-    rec.append(1.0) # insert 1.0 at end of list
+    rec.insert(0, 0.0)
+    rec.append(1.0)
     mrec = rec[:]
-    prec.insert(0, 0.0) # insert 0.0 at begining of list
-    prec.append(0.0) # insert 0.0 at end of list
+    prec.insert(0, 0.0)
+    prec.append(0.0)
     mpre = prec[:]
+
     for i in range(len(mpre)-2, -1, -1):
         mpre[i] = max(mpre[i], mpre[i+1])
+
     i_list = []
     for i in range(1, len(mrec)):
         if mrec[i] != mrec[i-1]:
-            i_list.append(i) # if it was matlab would be i + 1
+            i_list.append(i)
     ap = 0.0
     for i in i_list:
         ap += ((mrec[i]-mrec[i-1])*mpre[i])
@@ -48,7 +50,7 @@ def voc_ap(rec, prec):
 
 
 def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_SIZE=TEST_INPUT_SIZE):
-    MINOVERLAP = 0.5 # default value (defined in the PASCAL VOC2012 challenge)
+    MINOVERLAP = 0.5
     NUM_CLASS = read_class_names(TRAIN_CLASSES)
 
     ground_truth_dir_path = 'mAP/ground-truth'
@@ -77,7 +79,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         for i in range(num_bbox_gt):
             class_name = NUM_CLASS[classes_gt[i]]
             xmin, ymin, xmax, ymax = list(map(str, bboxes_gt[i]))
-            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
+            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
             bounding_boxes.append({"class_name":class_name, "bbox":bbox, "used":False})
 
             if class_name in gt_counter_per_class:
@@ -127,19 +129,23 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bboxes = postprocess_boxes(pred_bbox, original_image, TEST_INPUT_SIZE, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
 
+        # 예측 결과 출력
+        print(f"Image {index} predictions:")
+        for bbox in bboxes:
+            print(bbox)
+
         for bbox in bboxes:
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
             class_ind = int(bbox[5])
-            
-            if class_ind < len(NUM_CLASS):
-                class_name = NUM_CLASS[class_ind]
-                score = '%.4f' % score
-                xmin, ymin, xmax, ymax = list(map(str, coor))
-                bbox = xmin + " " + ymin + " " + xmax + " " + ymax
-                json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
-            else:
-                print(f"Warning: class index {class_ind} is out of bounds for NUM_CLASS with length {len(NUM_CLASS)}")
+            if class_ind >= len(NUM_CLASS):
+                print(f"Warning: class_ind {class_ind} out of range")
+                continue
+            class_name = NUM_CLASS[class_ind]
+            score = '%.4f' % score
+            xmin, ymin, xmax, ymax = list(map(str, coor))
+            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
+            json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
 
     ms = sum(times)/len(times)*1000
     fps = 1000 / ms
@@ -203,6 +209,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             for idx, val in enumerate(tp):
                 tp[idx] += cumsum
                 cumsum += val
+
             rec = tp[:]
             for idx, val in enumerate(tp):
                 rec[idx] = float(tp[idx]) / gt_counter_per_class[class_name]
@@ -231,7 +238,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         return mAP*100
 
 if __name__ == '__main__':       
-    if YOLO_FRAMEWORK == "tf": # TensorFlow detection
+    if YOLO_FRAMEWORK == "tf":
         if YOLO_TYPE == "yolov4":
             Darknet_weights = YOLO_V4_TINY_WEIGHTS if TRAIN_YOLO_TINY else YOLO_V4_WEIGHTS
         if YOLO_TYPE == "yolov3":
@@ -239,12 +246,12 @@ if __name__ == '__main__':
 
         if YOLO_CUSTOM_WEIGHTS == False:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=YOLO_COCO_CLASSES)
-            load_yolo_weights(yolo, Darknet_weights) # use Darknet weights
+            load_yolo_weights(yolo, Darknet_weights)
         else:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
-            yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}") # use custom weights
+            yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}")
         
-    elif YOLO_FRAMEWORK == "trt": # TensorRT detection
+    elif YOLO_FRAMEWORK == "trt":
         saved_model_loaded = tf.saved_model.load(f"./checkpoints/{TRAIN_MODEL_NAME}", tags=[tag_constants.SERVING])
         signature_keys = list(saved_model_loaded.signatures.keys())
         yolo = saved_model_loaded.signatures['serving_default']
