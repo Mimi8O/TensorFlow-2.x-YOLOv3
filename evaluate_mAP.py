@@ -48,25 +48,26 @@ def voc_ap(rec, prec):
 
 
 def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_SIZE=TEST_INPUT_SIZE):
-    MINOVERLAP = 0.5  # default value (defined in the PASCAL VOC2012 challenge)
+    MINOVERLAP = 0.5 # default value (defined in the PASCAL VOC2012 challenge)
     NUM_CLASS = read_class_names(TRAIN_CLASSES)
-    NUM_CLASS_LEN = len(NUM_CLASS)
+    print(f"NUM_CLASS: {NUM_CLASS}")
 
     ground_truth_dir_path = 'mAP/ground-truth'
-    if os.path.exists(ground_truth_dir_path):
-        shutil.rmtree(ground_truth_dir_path)
+    if os.path.exists(ground_truth_dir_path): shutil.rmtree(ground_truth_dir_path)
 
-    if not os.path.exists('mAP'):
-        os.mkdir('mAP')
+    if not os.path.exists('mAP'): os.mkdir('mAP')
     os.mkdir(ground_truth_dir_path)
 
-    print(f'\ncalculating mAP{int(iou_threshold * 100)}...\n')
+    print(f'\ncalculating mAP{int(iou_threshold*100)}...\n')
 
     gt_counter_per_class = {}
     for index in range(dataset.num_samples):
         ann_dataset = dataset.annotations[index]
 
         original_image, bbox_data_gt = dataset.parse_annotation(ann_dataset, True)
+        print(f"Processing {index} - {ann_dataset}")
+        print(f"Original image shape: {original_image.shape}")
+        print(f"Bbox data ground truth: {bbox_data_gt}")
 
         if len(bbox_data_gt) == 0:
             bboxes_gt = []
@@ -79,9 +80,10 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bounding_boxes = []
         for i in range(num_bbox_gt):
             class_name = NUM_CLASS[classes_gt[i]]
+            print(f"Class name: {class_name}, Class index: {classes_gt[i]}")
             xmin, ymin, xmax, ymax = list(map(str, bboxes_gt[i]))
-            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
-            bounding_boxes.append({"class_name": class_name, "bbox": bbox, "used": False})
+            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
+            bounding_boxes.append({"class_name":class_name, "bbox":bbox, "used":False})
 
             # count that object
             if class_name in gt_counter_per_class:
@@ -255,7 +257,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
 
         return mAP * 100
 
-if __name__ == '__main__':       
+if __name__ == '__main__':
     if YOLO_FRAMEWORK == "tf": # TensorFlow detection
         if YOLO_TYPE == "yolov4":
             Darknet_weights = YOLO_V4_TINY_WEIGHTS if TRAIN_YOLO_TINY else YOLO_V4_WEIGHTS
@@ -269,8 +271,10 @@ if __name__ == '__main__':
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
             yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}") # use custom weights
 
-        # 모델 요약 정보 출력 (디버깅용)
+        # 디버깅용 모델 요약 정보 출력
         yolo.summary()
+        for layer in yolo.layers:
+            print(layer.output_shape)
         
     elif YOLO_FRAMEWORK == "trt": # TensorRT detection
         saved_model_loaded = tf.saved_model.load(f"./checkpoints/{TRAIN_MODEL_NAME}", tags=[tag_constants.SERVING])
