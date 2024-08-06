@@ -28,39 +28,48 @@ if len(gpus) > 0:
     except RuntimeError: print("RuntimeError in tf.config.experimental.list_physical_devices('GPU')")
 
 
-def visualize_predictions(image, bboxes_gt, bboxes_pred, NUM_CLASS, index):
-    # Ground truth bounding boxes (Green)
-    for bbox in bboxes_gt:
-        x1, y1, x2, y2, cls = bbox
-        class_name = NUM_CLASS[int(cls)]
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(image, f"GT: {class_name}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-    # Predicted bounding boxes (Red)
-    for bbox in bboxes_pred:
-        x1, y1, x2, y2, score, cls = bbox
-        class_name = NUM_CLASS[int(cls)]
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 2)
-        cv2.putText(image, f"Pred: {class_name} {score:.2f}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
-    # Save the image to a file
-    cv2.imwrite(f'predictions_{index}.jpg', image)
-
-
-
 def voc_ap(rec, prec):
-    rec.insert(0, 0.0)
-    rec.append(1.0)
+    """
+    --- Official matlab code VOC2012---
+    mrec=[0 ; rec ; 1];
+    mpre=[0 ; prec ; 0];
+    for i=numel(mpre)-1:-1:1
+            mpre(i)=max(mpre(i),mpre(i+1));
+    end
+    i=find(mrec(2:end)~=mrec(1:end-1))+1;
+    ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
+    """
+    rec.insert(0, 0.0) # insert 0.0 at begining of list
+    rec.append(1.0) # insert 1.0 at end of list
     mrec = rec[:]
-    prec.insert(0, 0.0)
-    prec.append(0.0)
+    prec.insert(0, 0.0) # insert 0.0 at begining of list
+    prec.append(0.0) # insert 0.0 at end of list
     mpre = prec[:]
+    """
+     This part makes the precision monotonically decreasing
+        (goes from the end to the beginning)
+        matlab:  for i=numel(mpre)-1:-1:1
+                                mpre(i)=max(mpre(i),mpre(i+1));
+    """
+    # matlab indexes start in 1 but python in 0, so I have to do:
+    #   range(start=(len(mpre) - 2), end=0, step=-1)
+    # also the python function range excludes the end, resulting in:
+    #   range(start=(len(mpre) - 2), end=-1, step=-1)
     for i in range(len(mpre)-2, -1, -1):
         mpre[i] = max(mpre[i], mpre[i+1])
+    """
+     This part creates a list of indexes where the recall changes
+        matlab:  i=find(mrec(2:end)~=mrec(1:end-1))+1;
+    """
     i_list = []
     for i in range(1, len(mrec)):
         if mrec[i] != mrec[i-1]:
-            i_list.append(i)
+            i_list.append(i) # if it was matlab would be i + 1
+    """
+     The Average Precision (AP) is the area under the curve
+        (numerical integration)
+        matlab: ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
+    """
     ap = 0.0
     for i in i_list:
         ap += ((mrec[i]-mrec[i-1])*mpre[i])
@@ -70,7 +79,6 @@ def voc_ap(rec, prec):
 def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_SIZE=TEST_INPUT_SIZE):
     MINOVERLAP = 0.5 # default value (defined in the PASCAL VOC2012 challenge)
     NUM_CLASS = read_class_names(TRAIN_CLASSES)
-    print(f"NUM_CLASS: {NUM_CLASS}")
 
     ground_truth_dir_path = 'mAP/ground-truth'
     if os.path.exists(ground_truth_dir_path): shutil.rmtree(ground_truth_dir_path)
@@ -85,9 +93,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         ann_dataset = dataset.annotations[index]
 
         original_image, bbox_data_gt = dataset.parse_annotation(ann_dataset, True)
-        print(f"Processing {index} - {ann_dataset}")
-        print(f"Original image shape: {original_image.shape}")
-        print(f"Bbox data ground truth: {bbox_data_gt}")
 
         if len(bbox_data_gt) == 0:
             bboxes_gt = []
@@ -100,9 +105,8 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bounding_boxes = []
         for i in range(num_bbox_gt):
             class_name = NUM_CLASS[classes_gt[i]]
-            print(f"Class name: {class_name}, Class index: {classes_gt[i]}")
             xmin, ymin, xmax, ymax = list(map(str, bboxes_gt[i]))
-            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
+            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
             bounding_boxes.append({"class_name":class_name, "bbox":bbox, "used":False})
 
             # count that object
@@ -127,7 +131,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
 
         image_name = ann_dataset[0].split('/')[-1]
         original_image, bbox_data_gt = dataset.parse_annotation(ann_dataset, True)
-
+        
         image = image_preprocess(np.copy(original_image), [TEST_INPUT_SIZE, TEST_INPUT_SIZE])
         image_data = image[np.newaxis, ...].astype(np.float32)
 
@@ -144,39 +148,32 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             for key, value in result.items():
                 value = value.numpy()
                 pred_bbox.append(value)
-
+        
         t2 = time.time()
-
-        times.append(t2 - t1)
-
+        
+        times.append(t2-t1)
+        
         pred_bbox = [tf.reshape(x, (-1, tf.shape(x)[-1])) for x in pred_bbox]
         pred_bbox = tf.concat(pred_bbox, axis=0)
 
         bboxes = postprocess_boxes(pred_bbox, original_image, TEST_INPUT_SIZE, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
 
-        # 예측 결과 시각화
-        visualize_predictions(np.copy(original_image), bbox_data_gt, bboxes, NUM_CLASS, index)
-
         for bbox in bboxes:
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
             class_ind = int(bbox[5])
-            if class_ind >= len(NUM_CLASS):
-                print(f"Warning: class_ind {class_ind} out of range for image {index}")
-                continue  # 잘못된 클래스 인덱스 무시
             class_name = NUM_CLASS[class_ind]
             score = '%.4f' % score
             xmin, ymin, xmax, ymax = list(map(str, coor))
-            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
-            json_pred[gt_classes.index(class_name)].append(
-                {"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
+            bbox = xmin + " " + ymin + " " + xmax + " " +ymax
+            json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
 
-    ms = sum(times) / len(times) * 1000
+    ms = sum(times)/len(times)*1000
     fps = 1000 / ms
 
     for class_name in gt_classes:
-        json_pred[gt_classes.index(class_name)].sort(key=lambda x: float(x['confidence']), reverse=True)
+        json_pred[gt_classes.index(class_name)].sort(key=lambda x:float(x['confidence']), reverse=True)
         with open(f'{ground_truth_dir_path}/{class_name}_predictions.json', 'w') as outfile:
             json.dump(json_pred[gt_classes.index(class_name)], outfile)
 
@@ -195,7 +192,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
 
             # Assign predictions to ground truth objects
             nd = len(predictions_data)
-            tp = [0] * nd  # creates an array of zeros of size nd
+            tp = [0] * nd # creates an array of zeros of size nd
             fp = [0] * nd
             for idx, prediction in enumerate(predictions_data):
                 file_id = prediction["file_id"]
@@ -206,25 +203,25 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
                 ovmax = -1
                 gt_match = -1
                 # load prediction bounding-box
-                bb = [float(x) for x in prediction["bbox"].split()]  # bounding box of prediction
+                bb = [ float(x) for x in prediction["bbox"].split() ] # bounding box of prediction
                 for obj in ground_truth_data:
                     # look for a class_name match
                     if obj["class_name"] == class_name:
-                        bbgt = [float(x) for x in obj["bbox"].split()]  # bounding box of ground truth
-                        bi = [max(bb[0], bbgt[0]), max(bb[1], bbgt[1]), min(bb[2], bbgt[2]), min(bb[3], bbgt[3])]
+                        bbgt = [ float(x) for x in obj["bbox"].split() ] # bounding box of ground truth
+                        bi = [max(bb[0],bbgt[0]), max(bb[1],bbgt[1]), min(bb[2],bbgt[2]), min(bb[3],bbgt[3])]
                         iw = bi[2] - bi[0] + 1
                         ih = bi[3] - bi[1] + 1
                         if iw > 0 and ih > 0:
                             # compute overlap (IoU) = area of intersection / area of union
                             ua = (bb[2] - bb[0] + 1) * (bb[3] - bb[1] + 1) + (bbgt[2] - bbgt[0]
-                                                                             + 1) * (bbgt[3] - bbgt[1] + 1) - iw * ih
+                                            + 1) * (bbgt[3] - bbgt[1] + 1) - iw * ih
                             ov = iw * ih / ua
                             if ov > ovmax:
                                 ovmax = ov
                                 gt_match = obj
 
                 # assign prediction as true positive/don't care/false positive
-                if ovmax >= MINOVERLAP:  # if ovmax > minimum overlap
+                if ovmax >= MINOVERLAP:# if ovmax > minimum overlap
                     if not bool(gt_match["used"]):
                         # true positive
                         tp[idx] = 1
@@ -249,22 +246,22 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             for idx, val in enumerate(tp):
                 tp[idx] += cumsum
                 cumsum += val
-            # print(tp)
+            #print(tp)
             rec = tp[:]
             for idx, val in enumerate(tp):
                 rec[idx] = float(tp[idx]) / gt_counter_per_class[class_name]
-            # print(rec)
+            #print(rec)
             prec = tp[:]
             for idx, val in enumerate(tp):
                 prec[idx] = float(tp[idx]) / (fp[idx] + tp[idx])
-            # print(prec)
+            #print(prec)
 
             ap, mrec, mprec = voc_ap(rec, prec)
             sum_AP += ap
-            text = "{0:.3f}%".format(ap * 100) + " = " + class_name + " AP  "  # class_name + " AP = {0:.2f}%".format(ap*100)
+            text = "{0:.3f}%".format(ap*100) + " = " + class_name + " AP  " #class_name + " AP = {0:.2f}%".format(ap*100)
 
-            rounded_prec = ['%.3f' % elem for elem in prec]
-            rounded_rec = ['%.3f' % elem for elem in rec]
+            rounded_prec = [ '%.3f' % elem for elem in prec ]
+            rounded_rec = [ '%.3f' % elem for elem in rec ]
             # Write to results.txt
             results_file.write(text + "\n Precision: " + str(rounded_prec) + "\n Recall   :" + str(rounded_rec) + "\n\n")
 
@@ -274,14 +271,13 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         results_file.write("\n# mAP of all classes\n")
         mAP = sum_AP / n_classes
 
-        text = "mAP = {:.3f}%, {:.2f} FPS".format(mAP * 100, fps)
+        text = "mAP = {:.3f}%, {:.2f} FPS".format(mAP*100, fps)
         results_file.write(text + "\n")
         print(text)
+        
+        return mAP*100
 
-        return mAP * 100
-
-
-if __name__ == '__main__':
+if __name__ == '__main__':       
     if YOLO_FRAMEWORK == "tf": # TensorFlow detection
         if YOLO_TYPE == "yolov4":
             Darknet_weights = YOLO_V4_TINY_WEIGHTS if TRAIN_YOLO_TINY else YOLO_V4_WEIGHTS
