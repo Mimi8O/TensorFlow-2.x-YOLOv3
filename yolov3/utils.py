@@ -308,13 +308,11 @@ def detect_image(Yolo, image_path, output_path, input_size=416, show=False, CLAS
     bboxes = nms(bboxes, iou_threshold, method='nms')
 
     image = draw_bbox(original_image, bboxes, CLASSES=CLASSES, rectangle_colors=rectangle_colors)
-    # CreateXMLfile("XML_Detections", str(int(time.time())), original_image, bboxes, read_class_names(CLASSES))
 
     if output_path != '': 
         cv2.imwrite(output_path, image)
         
     if show:
-        # 이미지 표시
         plt.figure(figsize=(10, 10))
         plt.imshow(image)
         plt.axis('off')
