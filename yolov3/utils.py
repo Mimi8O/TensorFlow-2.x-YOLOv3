@@ -278,6 +278,12 @@ def postprocess_boxes(pred_bbox, original_image, input_size, score_threshold):
     return np.concatenate([coors, scores[:, np.newaxis], classes[:, np.newaxis]], axis=-1)
 
 
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+from yolov3.utils import YOLO_COCO_CLASSES, image_preprocess, postprocess_boxes, nms, draw_bbox
+
 def detect_image(Yolo, image_path, output_path, input_size=416, show=False, CLASSES=YOLO_COCO_CLASSES, score_threshold=0.3, iou_threshold=0.45, rectangle_colors=''):
     original_image = cv2.imread(image_path)
     original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
