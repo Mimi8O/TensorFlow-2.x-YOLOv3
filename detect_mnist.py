@@ -25,8 +25,15 @@ while True:
     image_info = open(label_txt).readlines()[ID].split()
 
     image_path = image_info[0]
+    output_path = "/kaggle/working/mnist_test.jpg"  # 결과 이미지를 저장할 경로
 
     yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
-    yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}") # use keras weights
+    yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}")  # use keras weights
 
-    detect_image(yolo, image_path, "mnist_test.jpg", input_size=YOLO_INPUT_SIZE, show=True, CLASSES=TRAIN_CLASSES, rectangle_colors=(255,0,0))
+    detect_image(yolo, image_path, output_path, input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES, rectangle_colors=(255,0,0))
+
+    # 이미지 저장 확인
+    if os.path.exists(output_path):
+        print(f"이미지가 성공적으로 저장되었습니다: {output_path}")
+    else:
+        print("이미지가 저장되지 않았습니다.")
