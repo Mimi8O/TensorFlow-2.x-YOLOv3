@@ -35,10 +35,8 @@ def voc_ap(rec, prec):
     prec.insert(0, 0.0)
     prec.append(0.0)
     mpre = prec[:]
-
     for i in range(len(mpre)-2, -1, -1):
         mpre[i] = max(mpre[i], mpre[i+1])
-
     i_list = []
     for i in range(1, len(mrec)):
         if mrec[i] != mrec[i-1]:
@@ -129,17 +127,14 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bboxes = postprocess_boxes(pred_bbox, original_image, TEST_INPUT_SIZE, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
 
-        # 예측 결과 출력
-        print(f"Image {index} predictions:")
-        for bbox in bboxes:
-            print(bbox)
-
+        print(f'Image {index} predictions:')
         for bbox in bboxes:
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
             class_ind = int(bbox[5])
+            print(bbox)
             if class_ind >= len(NUM_CLASS):
-                print(f"Warning: class_ind {class_ind} out of range")
+                print(f'Warning: class_ind {class_ind} out of range')
                 continue
             class_name = NUM_CLASS[class_ind]
             score = '%.4f' % score
@@ -209,7 +204,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             for idx, val in enumerate(tp):
                 tp[idx] += cumsum
                 cumsum += val
-
             rec = tp[:]
             for idx, val in enumerate(tp):
                 rec[idx] = float(tp[idx]) / gt_counter_per_class[class_name]
