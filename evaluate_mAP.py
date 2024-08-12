@@ -160,15 +160,20 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         print(f"Ground Truth Classes: {gt_classes_found}")
         print(f"Predicted Classes: {pred_classes_found}")
 
-        for bbox in bboxes:
-            coor = np.array(bbox[:4], dtype=np.int32)
-            score = bbox[4]
-            class_ind = int(bbox[5])
-            class_name = NUM_CLASS.get(class_ind, "Unknown")
-            score = '%.4f' % score
-            xmin, ymin, xmax, ymax = list(map(str, coor))
-            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
-            json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
+    for bbox in bboxes:
+        coor = np.array(bbox[:4], dtype=np.int32)
+        score = bbox[4]
+        class_ind = int(bbox[5])
+        class_name = NUM_CLASS.get(class_ind, "Unknown")
+        
+        # "Unknown" 클래스는 건너뜁니다.
+        if class_name == "Unknown":
+            continue
+    
+        score = '%.4f' % score
+        xmin, ymin, xmax, ymax = list(map(str, coor))
+        bbox = xmin + " " + ymin + " " + xmax + " " + ymax
+        json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
 
     ms = sum(times) / len(times) * 1000
     fps = 1000 / ms
