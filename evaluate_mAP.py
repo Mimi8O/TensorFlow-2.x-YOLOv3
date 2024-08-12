@@ -1,13 +1,3 @@
-#================================================================
-#
-#   File name   : evaluate_mAP.py
-#   Author      : PyLessons
-#   Created date: 2020-08-17
-#   Website     : https://pylessons.com/
-#   GitHub      : https://github.com/pythonlessons/TensorFlow-2.x-YOLOv3
-#   Description : used to evaluate model mAP and FPS
-#
-#================================================================
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import cv2
@@ -27,57 +17,26 @@ if len(gpus) > 0:
     try: tf.config.experimental.set_memory_growth(gpus[0], True)
     except RuntimeError: print("RuntimeError in tf.config.experimental.list_physical_devices('GPU')")
 
-
 def voc_ap(rec, prec):
-    """
-    --- Official matlab code VOC2012---
-    mrec=[0 ; rec ; 1];
-    mpre=[0 ; prec ; 0];
-    for i=numel(mpre)-1:-1:1
-            mpre(i)=max(mpre(i),mpre(i+1));
-    end
-    i=find(mrec(2:end)~=mrec(1:end-1))+1;
-    ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
-    """
-    rec.insert(0, 0.0) # insert 0.0 at begining of list
-    rec.append(1.0) # insert 1.0 at end of list
+    rec.insert(0, 0.0)
+    rec.append(1.0)
     mrec = rec[:]
-    prec.insert(0, 0.0) # insert 0.0 at begining of list
-    prec.append(0.0) # insert 0.0 at end of list
+    prec.insert(0, 0.0)
+    prec.append(0.0)
     mpre = prec[:]
-    """
-     This part makes the precision monotonically decreasing
-        (goes from the end to the beginning)
-        matlab:  for i=numel(mpre)-1:-1:1
-                                mpre(i)=max(mpre(i),mpre(i+1));
-    """
-    # matlab indexes start in 1 but python in 0, so I have to do:
-    #   range(start=(len(mpre) - 2), end=0, step=-1)
-    # also the python function range excludes the end, resulting in:
-    #   range(start=(len(mpre) - 2), end=-1, step=-1)
     for i in range(len(mpre)-2, -1, -1):
         mpre[i] = max(mpre[i], mpre[i+1])
-    """
-     This part creates a list of indexes where the recall changes
-        matlab:  i=find(mrec(2:end)~=mrec(1:end-1))+1;
-    """
     i_list = []
     for i in range(1, len(mrec)):
         if mrec[i] != mrec[i-1]:
-            i_list.append(i) # if it was matlab would be i + 1
-    """
-     The Average Precision (AP) is the area under the curve
-        (numerical integration)
-        matlab: ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
-    """
+            i_list.append(i)
     ap = 0.0
     for i in i_list:
         ap += ((mrec[i]-mrec[i-1])*mpre[i])
     return ap, mrec, mpre
 
-
 def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_SIZE=TEST_INPUT_SIZE):
-    MINOVERLAP = 0.5  # default value (defined in the PASCAL VOC2012 challenge)
+    MINOVERLAP = 0.5
     NUM_CLASS = read_class_names(TRAIN_CLASSES)
 
     ground_truth_dir_path = 'mAP/ground-truth'
@@ -91,7 +50,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
     gt_counter_per_class = {}
     for index in range(dataset.num_samples):
         ann_dataset = dataset.annotations[index]
-
         original_image, bbox_data_gt = dataset.parse_annotation(ann_dataset, True)
 
         if len(bbox_data_gt) == 0:
@@ -109,7 +67,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
             bbox = xmin + " " + ymin + " " + xmax + " " + ymax
             bounding_boxes.append({"class_name": class_name, "bbox": bbox, "used": False})
 
-            # count that object
             if class_name in gt_counter_per_class:
                 gt_counter_per_class[class_name] += 1
             else:
@@ -125,7 +82,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
     json_pred = [[] for _ in range(n_classes)]
     for index in range(dataset.num_samples):
         ann_dataset = dataset.annotations[index]
-
         original_image, bbox_data_gt = dataset.parse_annotation(ann_dataset, True)
 
         image = image_preprocess(np.copy(original_image), [TEST_INPUT_SIZE, TEST_INPUT_SIZE])
@@ -152,7 +108,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         bboxes = postprocess_boxes(pred_bbox, original_image, TEST_INPUT_SIZE, score_threshold)
         bboxes = nms(bboxes, iou_threshold, method='nms')
 
-        # Debug: Print GT and predictions for each image
         gt_classes_found = [NUM_CLASS.get(int(cls), "Unknown") for cls in bbox_data_gt[:, 4]] if len(bbox_data_gt) > 0 else []
         pred_classes_found = [NUM_CLASS.get(int(bbox[5]), "Unknown") for bbox in bboxes] if len(bboxes) > 0 else []
 
@@ -160,20 +115,19 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         print(f"Ground Truth Classes: {gt_classes_found}")
         print(f"Predicted Classes: {pred_classes_found}")
 
-    for bbox in bboxes:
-        coor = np.array(bbox[:4], dtype=np.int32)
-        score = bbox[4]
-        class_ind = int(bbox[5])
-        class_name = NUM_CLASS.get(class_ind, "Unknown")
-        
-        # "Unknown" 클래스는 건너뜁니다.
-        if class_name == "Unknown":
-            continue
-    
-        score = '%.4f' % score
-        xmin, ymin, xmax, ymax = list(map(str, coor))
-        bbox = xmin + " " + ymin + " " + xmax + " " + ymax
-        json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
+        for bbox in bboxes:
+            coor = np.array(bbox[:4], dtype=np.int32)
+            score = bbox[4]
+            class_ind = int(bbox[5])
+            class_name = NUM_CLASS.get(class_ind, "Unknown")
+            
+            if class_name == "Unknown":
+                continue
+            
+            score = '%.4f' % score
+            xmin, ymin, xmax, ymax = list(map(str, coor))
+            bbox = xmin + " " + ymin + " " + xmax + " " + ymax
+            json_pred[gt_classes.index(class_name)].append({"confidence": str(score), "file_id": str(index), "bbox": str(bbox)})
 
     ms = sum(times) / len(times) * 1000
     fps = 1000 / ms
@@ -183,7 +137,6 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         with open(f'{ground_truth_dir_path}/{class_name}_predictions.json', 'w') as outfile:
             json.dump(json_pred[gt_classes.index(class_name)], outfile)
 
-    # Calculate the AP for each class
     sum_AP = 0.0
     ap_dictionary = {}
     with open("mAP/results.txt", 'w') as results_file:
@@ -261,7 +214,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         return mAP * 100
 
 if __name__ == '__main__':       
-    if YOLO_FRAMEWORK == "tf": # TensorFlow detection
+    if YOLO_FRAMEWORK == "tf":
         if YOLO_TYPE == "yolov4":
             Darknet_weights = YOLO_V4_TINY_WEIGHTS if TRAIN_YOLO_TINY else YOLO_V4_WEIGHTS
         if YOLO_TYPE == "yolov3":
@@ -269,15 +222,25 @@ if __name__ == '__main__':
 
         if YOLO_CUSTOM_WEIGHTS == False:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=YOLO_COCO_CLASSES)
-            load_yolo_weights(yolo, Darknet_weights) # use Darknet weights
+            load_yolo_weights(yolo, Darknet_weights)
+
+            # First layer weights 출력 추가
+            print("First layer weights:", yolo.layers[0].weights)
+
         else:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
-            yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}") # use custom weights
+            yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}")
+
+            # First layer weights 출력 추가
+            print("First layer weights:", yolo.layers[0].weights)
         
-    elif YOLO_FRAMEWORK == "trt": # TensorRT detection
+    elif YOLO_FRAMEWORK == "trt":
         saved_model_loaded = tf.saved_model.load(f"./checkpoints/{TRAIN_MODEL_NAME}", tags=[tag_constants.SERVING])
         signature_keys = list(saved_model_loaded.signatures.keys())
         yolo = saved_model_loaded.signatures['serving_default']
+
+        # TRT 모델에서는 weights 확인이 어려울 수 있습니다.
+        print("TensorRT model loaded.")
 
     testset = Dataset('test', TEST_INPUT_SIZE=YOLO_INPUT_SIZE)
     get_mAP(yolo, testset, score_threshold=0.05, iou_threshold=0.50, TEST_INPUT_SIZE=YOLO_INPUT_SIZE)
