@@ -292,7 +292,7 @@ def detect_image(Yolo, image_path, output_path, input_size=416, CLASSES=YOLO_COC
     image_data = image_data[np.newaxis, ...].astype(np.float32)
 
     if YOLO_FRAMEWORK == "tf":
-        pred_bbox = Yolo.predict(image_data)
+        pred_bbox = Yolo(image_data)
     elif YOLO_FRAMEWORK == "trt":
         batched_input = tf.constant(image_data)
         result = Yolo(batched_input)
