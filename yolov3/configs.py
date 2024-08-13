@@ -59,8 +59,8 @@ TEST_BATCH_SIZE             = 4
 TEST_INPUT_SIZE             = 416
 TEST_DATA_AUG               = False
 TEST_DECTECTED_IMAGE_PATH   = ""
-TEST_SCORE_THRESHOLD        = 0.3
-TEST_IOU_THRESHOLD          = 0.45
+TEST_SCORE_THRESHOLD        = 0.2
+TEST_IOU_THRESHOLD          = 0.5
 
 if TRAIN_YOLO_TINY:
     YOLO_STRIDES            = [16, 32]    
