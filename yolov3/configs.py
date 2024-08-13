@@ -54,7 +54,7 @@ TRAIN_WARMUP_EPOCHS         = 2
 TRAIN_EPOCHS                = 1
 
 # TEST options
-TEST_ANNOT_PATH             = "mnist/mnist_test.txt"
+TEST_ANNOT_PATH             = "/kaggle/working/TensorFlow-2.x-YOLOv3/mnist/mnist_test.txt"
 TEST_BATCH_SIZE             = 4
 TEST_INPUT_SIZE             = 416
 TEST_DATA_AUG               = False
