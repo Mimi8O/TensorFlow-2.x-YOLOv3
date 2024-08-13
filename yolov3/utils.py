@@ -21,6 +21,9 @@ from tensorflow.python.saved_model import tag_constants
 
 def load_yolo_weights(model, weights_file):
     tf.keras.backend.clear_session()  # used to reset layer names
+    print("Skipping weight loading to test model initialization.")
+    return  # 가중치 로드를 생략하여 모델이 기본적으로 잘 초기화되는지 확인
+    
     # load Darknet original weights to TensorFlow model
     if YOLO_TYPE == "yolov3":
         range1 = 75 if not TRAIN_YOLO_TINY else 13
@@ -101,6 +104,7 @@ def Load_Yolo_model():
             print("Loading Darknet_weights from:", Darknet_weights)
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=YOLO_COCO_CLASSES)
             load_yolo_weights(yolo, Darknet_weights) # use Darknet weights
+            
         else:
             checkpoint = f"./checkpoints/{TRAIN_MODEL_NAME}"
             if TRAIN_YOLO_TINY:
