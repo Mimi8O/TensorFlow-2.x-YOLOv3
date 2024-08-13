@@ -20,7 +20,7 @@ from yolov3.yolov4 import *
 from tensorflow.python.saved_model import tag_constants
 
 def load_yolo_weights(model, weights_file):
-    tf.keras.backend.clear_session() # used to reset layer names
+    tf.keras.backend.clear_session()  # used to reset layer names
     # load Darknet original weights to TensorFlow model
     if YOLO_TYPE == "yolov3":
         range1 = 75 if not TRAIN_YOLO_TINY else 13
@@ -28,43 +28,53 @@ def load_yolo_weights(model, weights_file):
     if YOLO_TYPE == "yolov4":
         range1 = 110 if not TRAIN_YOLO_TINY else 21
         range2 = [93, 101, 109] if not TRAIN_YOLO_TINY else [17, 20]
-    
+
     with open(weights_file, 'rb') as wf:
         major, minor, revision, seen, _ = np.fromfile(wf, dtype=np.int32, count=5)
 
         j = 0
         for i in range(range1):
             if i > 0:
-                conv_layer_name = 'conv2d_%d' %i
+                conv_layer_name = 'conv2d_%d' % i
             else:
                 conv_layer_name = 'conv2d'
-                
+
             if j > 0:
-                bn_layer_name = 'batch_normalization_%d' %j
+                bn_layer_name = 'batch_normalization_%d' % j
             else:
                 bn_layer_name = 'batch_normalization'
-            
+
             conv_layer = model.get_layer(conv_layer_name)
             filters = conv_layer.filters
             k_size = conv_layer.kernel_size[0]
             in_dim = conv_layer.input_shape[-1]
 
+            print(f"\nLoading weights for {conv_layer_name}: filters={filters}, kernel_size={k_size}, in_dim={in_dim}")
+
             if i not in range2:
-                # darknet weights: [beta, gamma, mean, variance]
+                # Load batch normalization weights
                 bn_weights = np.fromfile(wf, dtype=np.float32, count=4 * filters)
-                # tf weights: [gamma, beta, mean, variance]
                 bn_weights = bn_weights.reshape((4, filters))[[1, 0, 2, 3]]
                 bn_layer = model.get_layer(bn_layer_name)
+
+                # Debugging: Print batch normalization weights
+                print(f"Batch Norm weights shape: {bn_weights.shape}")
                 j += 1
             else:
                 conv_bias = np.fromfile(wf, dtype=np.float32, count=filters)
 
-            # darknet shape (out_dim, in_dim, height, width)
+                # Debugging: Print convolution bias weights
+                print(f"Conv bias shape: {conv_bias.shape}")
+
+            # Load convolutional weights
             conv_shape = (filters, in_dim, k_size, k_size)
             conv_weights = np.fromfile(wf, dtype=np.float32, count=np.product(conv_shape))
-            # tf shape (height, width, in_dim, out_dim)
             conv_weights = conv_weights.reshape(conv_shape).transpose([2, 3, 1, 0])
 
+            # Debugging: Print convolutional weights
+            print(f"Conv weights shape: {conv_weights.shape}")
+
+            # Set weights to the model
             if i not in range2:
                 conv_layer.set_weights([conv_weights])
                 bn_layer.set_weights(bn_weights)
@@ -72,6 +82,7 @@ def load_yolo_weights(model, weights_file):
                 conv_layer.set_weights([conv_weights, conv_bias])
 
         assert len(wf.read()) == 0, 'failed to read all data'
+
 
 def Load_Yolo_model():
     gpus = tf.config.experimental.list_physical_devices('GPU')
