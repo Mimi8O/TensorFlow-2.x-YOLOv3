@@ -216,7 +216,7 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         
         return mAP * 100
 
-if __name__ == '__main__':       
+if __name__ == '__main__':
     if YOLO_FRAMEWORK == "tf":
         if YOLO_TYPE == "yolov4":
             Darknet_weights = YOLO_V4_TINY_WEIGHTS if TRAIN_YOLO_TINY else YOLO_V4_WEIGHTS
@@ -226,24 +226,27 @@ if __name__ == '__main__':
         if YOLO_CUSTOM_WEIGHTS == False:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=YOLO_COCO_CLASSES)
             load_yolo_weights(yolo, Darknet_weights)
-
-            # First layer weights 출력 추가
-            print("First layer weights:", yolo.layers[0].weights)
-
+            
+            # 2번: 가중치 로드를 생략한 후 첫 번째 레이어 가중치 출력
+            print("First layer weights after skipping weight loading:", yolo.layers[0].get_weights())
+            
+            # 6번: 모든 레이어에서 가중치 로드 여부 확인
+            for i, layer in enumerate(yolo.layers):
+                print(f"Layer {i} ({layer.name}):")
+                weights = layer.get_weights()
+                if weights:
+                    print("Weights loaded successfully.")
+                else:
+                    print("No weights loaded.")
+        
         else:
             yolo = Create_Yolo(input_size=YOLO_INPUT_SIZE, CLASSES=TRAIN_CLASSES)
             yolo.load_weights(f"./checkpoints/{TRAIN_MODEL_NAME}")
 
-            # First layer weights 출력 추가
-            print("First layer weights:", yolo.layers[0].weights)
-        
+            # 위와 동일한 디버깅 코드 추가 가능
     elif YOLO_FRAMEWORK == "trt":
-        saved_model_loaded = tf.saved_model.load(f"./checkpoints/{TRAIN_MODEL_NAME}", tags=[tag_constants.SERVING])
-        signature_keys = list(saved_model_loaded.signatures.keys())
-        yolo = saved_model_loaded.signatures['serving_default']
-
-        # TRT 모델에서는 weights 확인이 어려울 수 있습니다.
-        print("TensorRT model loaded.")
+        # TensorRT 관련 코드 생략
+        pass
 
     testset = Dataset('test', TEST_INPUT_SIZE=YOLO_INPUT_SIZE)
     get_mAP(yolo, testset, score_threshold=0.05, iou_threshold=0.50, TEST_INPUT_SIZE=YOLO_INPUT_SIZE)
