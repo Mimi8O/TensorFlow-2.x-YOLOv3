@@ -115,15 +115,18 @@ def get_mAP(Yolo, dataset, score_threshold=0.25, iou_threshold=0.50, TEST_INPUT_
         print(f"Ground Truth Classes: {gt_classes_found}")
         print(f"Predicted Classes: {pred_classes_found}")
 
+        # 추가된 코드: 모든 예측 박스를 출력
         for bbox in bboxes:
+            print(f"Predicted bbox: {bbox}")
             coor = np.array(bbox[:4], dtype=np.int32)
             score = bbox[4]
             class_ind = int(bbox[5])
             class_name = NUM_CLASS.get(class_ind, "Unknown")
+            print(f"Class: {class_name}, Score: {score}")
             
             if class_name == "Unknown":
                 continue
-            
+                
             score = '%.4f' % score
             xmin, ymin, xmax, ymax = list(map(str, coor))
             bbox = xmin + " " + ymin + " " + xmax + " " + ymax
